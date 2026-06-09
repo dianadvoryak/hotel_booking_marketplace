@@ -8,3 +8,31 @@ services:
             POSTGRES_HOST_AUTH_METHOD: trust
         ports:
             - "5432:5432"
+        volumes:
+            - pgdata:/var/lib/postgresql/data
+
+    rabbitmq:
+        image: rabbitmq:3-management-alpine
+        container_name: rabbitmq
+        environment:
+            RABBITMQ_DEFAULT_USER: guest
+            RABBITMQ_DEFAULT_PASS: guest
+        ports:
+            - "5672:5672"
+            - "15672:15672"
+        volumes:
+            - rabbitdata:/var/lib/rabbitmq
+
+    redis:
+        image: redis:7-alpine
+        container_name: redis
+        ports:
+            - "6379:6379"
+        volumes:
+            - redisdata:/var/lib/redis
+        command: redis-server --appendonly yes # Включает сохранение данных на диск
+
+volumes:
+    pgdata:
+    rabbitdata:
+    redisdata:

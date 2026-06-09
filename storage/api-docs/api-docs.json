@@ -1,0 +1,172 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Hotel Booking Marketplace API",
+        "description": "API системы бронирования отелей с защитой от овербукинга (Redis Lock) и фоновым экспортом данных (RabbitMQ)",
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "/api",
+            "description": "Локальный сервер разработки"
+        }
+    ],
+    "paths": {
+        "/bookings": {
+            "post": {
+                "tags": [
+                    "Bookings"
+                ],
+                "summary": "Забронировать номер в отеле",
+                "description": "Принимает параметры брони, проверяет доступность через Redis Lock, транзакционно обновляет сетку и отправляет задачу в RabbitMQ",
+                "operationId": "storeBooking",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreBookingRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Бронирование успешно создано",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BookingResource"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Ошибка валидации или отсутствие свободных мест (Овербукинг)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "error": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "К сожалению, на выбранные даты нет свободных номеров."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "423": {
+                        "description": "Ресурс заблокирован (Параллельный запрос перехвачен Redis Lock)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "error": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Система обрабатывает другой запрос на этот номер. Попробуйте еще раз."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "StoreBookingRequest": {
+                "title": "Запрос на создание бронирования",
+                "required": [
+                    "hotel_id",
+                    "room_type_id",
+                    "check_in",
+                    "check_out"
+                ],
+                "properties": {
+                    "hotel_id": {
+                        "description": "UUID отеля",
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "9c3a4f61-2e61-4b13-bb14-9b5cfda18712"
+                    },
+                    "room_type_id": {
+                        "description": "UUID категории номера",
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "9c3a4f61-2e61-4b13-bb14-9b5cfda18754"
+                    },
+                    "check_in": {
+                        "description": "Дата заезда (YYYY-MM-DD)",
+                        "type": "string",
+                        "format": "date",
+                        "example": "2026-07-10"
+                    },
+                    "check_out": {
+                        "description": "Дата выезда (YYYY-MM-DD)",
+                        "type": "string",
+                        "format": "date",
+                        "example": "2026-07-15"
+                    }
+                },
+                "type": "object"
+            },
+            "BookingResource": {
+                "title": "Модель успешного ответа бронирования",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "9c3b88fe-1422-4467-bc1a-641bd3200ff1"
+                    },
+                    "status": {
+                        "type": "string",
+                        "example": "pending"
+                    },
+                    "total_price": {
+                        "description": "Итоговая сумма (в валюте)",
+                        "type": "string",
+                        "example": "450.00"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-06-09T16:30:00Z"
+                    },
+                    "hotel": {
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "example": "Grand Hyatt Hotel"
+                            },
+                            "city": {
+                                "type": "string",
+                                "example": "Москва"
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Bookings",
+            "description": "Bookings"
+        }
+    ]
+}
