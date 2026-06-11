@@ -56,6 +56,7 @@ class BookingController extends Controller
             new OA\Property(property: "message", type: "string", example: "Система обрабатывает другой запрос на этот номер. Попробуйте еще раз.")
         ])
     )]
+
     public function store(StoreBookingRequest $request): JsonResponse
     {
         try {

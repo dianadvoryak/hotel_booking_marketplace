@@ -35,10 +35,7 @@ class BookingService
         $lockKey = "lock:room_type:{$roomTypeId}";
 
         // Пытаемся взять блокировку на 5 секунд. Если занято — выбрасываем Exception
-//        $lock = Redis::lock($lockKey, 5); // тут ошибка
-        // Получаем чистый инстанс блокировщика Redis, который предоставляет Laravel под капотом
-        $lock = Redis::connection()->client()->lock($lockKey, 5);
-        $lock = Cache::lock($lockKey, 5);
+        $lock = Cache::store('redis')->lock($lockKey, 5);
 
         if (!$lock->get()) {
             throw BookingException::dynamicLockFailed();
@@ -89,13 +86,26 @@ class BookingService
                     'price_per_night' => $roomType->base_price,
                 ]);
 
-                // Обновляем сетку доступности (увеличиваем booked_count на +1)
+
                 foreach ($dates as $date) {
-                    RoomAvailability::updateOrCreate(
-                        ['room_type_id' => $roomTypeId, 'date' => $date],
-                        ['booked_count' => DB::raw('booked_count + 1')]
-                    );
+                    $availability = RoomAvailability::where('room_type_id', $roomTypeId)
+                        ->where('date', $date)
+                        ->first();
+
+                    if ($availability) {
+                        // Выполнит чистый UPDATE ... SET booked_count = booked_count + 1
+                        $availability->increment('booked_count');
+                    } else {
+                        // Выполнит корректный INSERT со значением 1
+                        RoomAvailability::create([
+                            'room_type_id' => $roomTypeId,
+                            'date' => $date,
+                            'booked_count' => 1,
+                        ]);
+                    }
                 }
+
+
 
                 // 3. ОТПРАВЛЯЕМ СОБЫТИЕ В RABBITMQ
                 // dispatch_after_commit выполнит отправку в очередь ТОЛЬКО после того,
