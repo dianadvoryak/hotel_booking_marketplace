@@ -120,4 +120,63 @@ class BookingService
             $lock->release();
         }
     }
+
+    /**
+     * Зарезервировать номер на 10 минут для оплаты
+     * @throws BookingException
+     */
+    public function holdRoom(string $userId, string $roomTypeId, string $checkIn, string $checkOut): array
+    {
+        $startDate = Carbon::parse($checkIn);
+        $endDate = Carbon::parse($checkOut);
+        $period = CarbonPeriod::create($startDate, $endDate->copy()->subDay());
+        $dates = collect($period)->map(fn($date) => $date->toDateString())->toArray();
+
+        // Senior-логика: создаем уникальный токен резерва
+        $token = (string) str()->uuid();
+        $roomType = RoomType::findOrFail($roomTypeId);
+
+        // 1. Проверяем каждую дату на наличие ЖЕСТКИХ броней в БД + ВРЕМЕННЫХ резервов в Redis
+        foreach ($dates as $date) {
+            // Сколько забронировано в БД
+            $dbBooked = RoomAvailability::where('room_type_id', $roomTypeId)
+                ->where('date', $date)
+                ->value('booked_count') ?? 0;
+
+            // Сколько СЕЙЧАС удерживается в Redis другими пользователями (счетчик в Redis)
+            $redisHoldKey = "rooms:hold:{$roomTypeId}:{$date}";
+            $redisHoldCount = (int) Cache::get($redisHoldKey, 0);
+
+            // Если сумма броней и резервов превышает общее кол-во комнат
+            if (($dbBooked + $redisHoldCount) >= $roomType->total_rooms) {
+                throw BookingException::noRoomsAvailable();
+            }
+        }
+
+        // 2. Если места есть — атомарно увеличиваем счетчик удерживаемых комнат в Redis на 10 минут (600 секунд)
+        foreach ($dates as $date) {
+            $redisHoldKey = "rooms:hold:{$roomTypeId}:{$date}";
+
+            // Если ключа нет, инициализируем его с TTL 10 минут, иначе просто инкрементируем
+            if (!Cache::has($redisHoldKey)) {
+                Cache::put($redisHoldKey, 1, 600);
+            } else {
+                Cache::increment($redisHoldKey);
+            }
+        }
+
+        // 3. Сохраняем информацию о самом резерве в Redis, чтобы знать, какие даты и сколько комнат отпустить при отмене/оплате
+        $reserveKey = "reserve:token:{$token}";
+        Cache::put($reserveKey, [
+            'user_id' => $userId,
+            'room_type_id' => $roomTypeId,
+            'dates' => $dates
+        ], 600);
+
+        return [
+            'reservation_token' => $token,
+            'expires_at' => now()->addMinutes(10)->toIso8601String(),
+            'message' => 'Номер успешно заморожен на 10 минут. Ожидание оплаты.'
+        ];
+    }
 }

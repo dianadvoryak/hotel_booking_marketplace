@@ -84,6 +84,57 @@
                 }
             }
         },
+        "/bookings/hold": {
+            "post": {
+                "tags": [
+                    "Bookings"
+                ],
+                "summary": "Временно заблокировать (заморозить) номер для оплаты",
+                "description": "Блокирует свободную комнату в Redis на 10 минут. Предотвращает конкурентное бронирование без нагрузки на PostgreSQL.",
+                "operationId": "holdRoom",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreBookingRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Комната успешно удержана",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "reservation_token": {
+                                            "type": "string",
+                                            "format": "uuid",
+                                            "example": "3b25f123-1122-4467-bc1a-641bd3200aa9"
+                                        },
+                                        "expires_at": {
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "example": "2026-06-11T16:40:00Z"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Номер успешно заморожен на 10 минут."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Нет свободных мест на выбранные даты"
+                    }
+                }
+            }
+        },
         "/hotels/popular": {
             "get": {
                 "tags": [

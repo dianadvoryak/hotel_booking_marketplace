@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\HoldRoomRequest;
 use App\Http\Requests\StoreBookingRequest;
 use App\Http\Resources\BookingResource;
 use App\Services\BookingService;
@@ -93,6 +94,55 @@ class BookingController extends Controller
                 'error' => true,
                 'message' => 'Внутренняя ошибка сервера. Попробуйте позже.'
             ], 500);
+        }
+    }
+
+
+    #[OA\Post(
+        path: "/bookings/hold",
+        operationId: "holdRoom",
+        description: "Блокирует свободную комнату в Redis на 10 минут. Предотвращает конкурентное бронирование без нагрузки на PostgreSQL.",
+        summary: "Временно заблокировать (заморозить) номер для оплаты",
+        tags: ["Bookings"]
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(ref: "#/components/schemas/StoreBookingRequest")
+    )]
+    #[OA\Response(
+        response: 200,
+        description: "Комната успешно удержана",
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: "reservation_token", type: "string", format: "uuid", example: "3b25f123-1122-4467-bc1a-641bd3200aa9"),
+                new OA\Property(property: "expires_at", type: "string", format: "date-time", example: "2026-06-11T16:40:00Z"),
+                new OA\Property(property: "message", type: "string", example: "Номер успешно заморожен на 10 минут.")
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 422,
+        description: "Нет свободных мест на выбранные даты"
+    )]
+    public function hold(HoldRoomRequest $request): JsonResponse
+    {
+        try {
+            $userId = \App\Models\User::firstOrFail()->id; // Тестовый юзер
+
+            $result = $this->bookingService->holdRoom(
+                $userId,
+                $request->input('room_type_id'),
+                $request->input('check_in'),
+                $request->input('check_out')
+            );
+
+            return response()->json($result, 200);
+
+        } catch (BookingException $e) {
+            return response()->json([
+                'error' => true,
+                'message' => $e->getMessage()
+            ], $e->getCode());
         }
     }
 }
