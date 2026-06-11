@@ -83,6 +83,31 @@
                     }
                 }
             }
+        },
+        "/hotels/popular": {
+            "get": {
+                "tags": [
+                    "Hotels"
+                ],
+                "summary": "Получить список популярных отелей",
+                "description": "Возвращает топ отелей с рейтингом выше 4.0. Данные кэшируются в Redis на 30 минут.",
+                "operationId": "getPopularHotels",
+                "responses": {
+                    "200": {
+                        "description": "Успешный возврат списка отелей",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/HotelPopularResource"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "components": {
@@ -160,6 +185,34 @@
                     }
                 },
                 "type": "object"
+            },
+            "HotelPopularResource": {
+                "title": "Модель популярного отеля на главной",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "9c3a4f61-2e61-4b13-bb14-9b5cfda18712"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Grand Royal Hotel"
+                    },
+                    "city": {
+                        "type": "string",
+                        "example": "Москва"
+                    },
+                    "address": {
+                        "type": "string",
+                        "example": "ул. Ленина, д. 10"
+                    },
+                    "rating": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 4.85
+                    }
+                },
+                "type": "object"
             }
         }
     },
@@ -167,6 +220,10 @@
         {
             "name": "Bookings",
             "description": "Bookings"
+        },
+        {
+            "name": "Hotels",
+            "description": "Hotels"
         }
     ]
 }
