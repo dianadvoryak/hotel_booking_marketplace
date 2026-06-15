@@ -10,6 +10,10 @@ php artisan tinker
 
 php artisan queue:work
 
+php artisan test --filter=HoldRoomRequestTest
+php artisan test --filter=ConfirmBookingRequestTest
+php artisan test --testsuite=Feature
+php artisan test --filter=ControllerTest
 
 scheme:
 <img src="public/scheme.jpg">
