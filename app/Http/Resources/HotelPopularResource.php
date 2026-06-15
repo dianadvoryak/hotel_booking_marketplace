@@ -27,11 +27,11 @@ class HotelPopularResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id'      => $this['id'],      // ИСПРАВЛЕНО: $this['id'] вместо $this->id
-            'name'    => $this['name'],    // ИСПРАВЛЕНО
-            'city'    => $this['city'],    // ИСПРАВЛЕНО
-            'address' => $this['address'], // ИСПРАВЛЕНО
-            'rating'  => (float) $this['rating'], // ИСПРАВЛЕНО
+            'id'      => $this['id'],
+            'name'    => $this['name'],
+            'city'    => $this['city'],
+            'address' => $this['address'],
+            'rating'  => (float) $this['rating'],
         ];
     }
 }

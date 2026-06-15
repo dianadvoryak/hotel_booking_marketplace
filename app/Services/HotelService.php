@@ -26,7 +26,7 @@ class HotelService
                 ->orderByDesc('rating')
                 ->limit(6)
                 ->get()
-                ->toArray(); // ИСПРАВЛЕНО: переводим коллекцию в массив перед записью в Redis
+                ->toArray(); // переводим коллекцию в массив перед записью в Redis
         });
     }
 
