@@ -179,4 +179,103 @@ class BookingService
             'message' => 'Номер успешно заморожен на 10 минут. Ожидание оплаты.'
         ];
     }
+
+    /**
+     * Подтвердить оплату и перенести бронь из Redis в PostgreSQL
+     * @throws BookingException
+     */
+    public function confirmBooking(string $token): Booking
+    {
+        $reserveKey = "reserve:token:{$token}";
+
+        // 1. Проверяем, есть ли токен в Redis
+        $reserveData = Cache::get($reserveKey);
+
+        if (!$reserveData) {
+            throw new BookingException('Срок действия резерва истек или токен недействителен.', 410);
+        }
+
+        $userId = $reserveData['user_id'];
+        $roomTypeId = $reserveData['room_type_id'];
+        $dates = $reserveData['dates'];
+
+        // Получаем информацию о комнате, чтобы узнать базовую цену и ID отеля
+        $roomType = RoomType::findOrFail($roomTypeId);
+        $totalPrice = $roomType->base_price * count($dates);
+
+        // 1. Сначала рассчитываем стоимость
+        $totalPrice = $roomType->base_price * count($dates);
+
+        // 2. ОТКРЫВАЕМ ТРАНЗАКЦИЮ В БАЗЕ ДАННЫХ
+        $booking = DB::transaction(function () use ($userId, $roomType, $dates, $totalPrice) {
+
+            // Создаем постоянную бронь со статусом 'paid' (Оплачено)
+            $booking = Booking::create([
+                'user_id' => $userId,
+                'hotel_id' => $roomType->hotel_id,
+                'status' => 'paid',
+                'total_price' => $totalPrice,
+            ]);
+
+            // Записываем детали
+            BookingItem::create([
+                'booking_id' => $booking->id,
+                'room_type_id' => $roomType->id,
+                'check_in_date' => head($dates), // Первая дата массива
+                'check_out_date' => Carbon::parse(last($dates))->addDay()->toDateString(), // Дата выезда +1 день
+                'price_per_night' => $roomType->base_price,
+            ]);
+
+            // Фиксируем даты в сетке занятости БД PostgreSQL
+//            foreach ($dates as $date) {
+//                RoomAvailability::updateOrCreate(
+//                    ['room_type_id' => $roomType->id, 'date' => $date],
+//                    ['booked_count' => DB::raw('booked_count + 1')]
+//                );
+//            }
+
+            foreach ($dates as $date) {
+                DB::table('room_availability')->upsert(
+                    [
+                        'room_type_id' => $roomType->id,
+                        'date'         => $date,
+                        'booked_count' => 1, // Значение, если записи нет (будет вставлена 1)
+                        'created_at'   => now(),
+                        'updated_at'   => now(),
+                    ],
+                    ['room_type_id', 'date'], // Уникальный ключ для проверки конфликта
+                    // Что делать при конфликте (происходит UPDATE):
+                    [
+                        'booked_count' => DB::raw('room_availability.booked_count + 1'),
+                        'updated_at'   => now(),
+                    ]
+                );
+            }
+
+            // Отправляем задачу воркеру RabbitMQ (генерация ваучера)
+            ProcessNewBookingJob::dispatch($booking->id)->afterCommit();
+
+            return $booking;
+        });
+
+        // 3. ОЧИЩАЕМ REDIS ПОСЛЕ УСПЕШНОЙ ЗАПИСИ В БД
+        foreach ($dates as $date) {
+            $redisHoldKey = "rooms:hold:{$roomTypeId}:{$date}";
+
+            // Атомарно уменьшаем счетчик временных удержаний в Redis
+            if (Cache::has($redisHoldKey)) {
+                $currentHold = (int) Cache::get($redisHoldKey);
+                if ($currentHold <= 1) {
+                    Cache::forget($redisHoldKey); // Если оставался последний, удаляем ключ полностью
+                } else {
+                    Cache::decrement($redisHoldKey);
+                }
+            }
+        }
+
+        // Удаляем сам использованный токен резерва
+        Cache::forget($reserveKey);
+
+        return $booking;
+    }
 }

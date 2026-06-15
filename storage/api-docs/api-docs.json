@@ -135,6 +135,51 @@
                 }
             }
         },
+        "/bookings/confirm": {
+            "post": {
+                "tags": [
+                    "Bookings"
+                ],
+                "summary": "Подтвердить и оплатить бронирование по токену резерва",
+                "description": "Проверяет токен в Redis. Если он валиден, переносит бронь в PostgreSQL и очищает память в Redis.",
+                "operationId": "confirmBooking",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "reservation_token"
+                                ],
+                                "properties": {
+                                    "reservation_token": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "example": "3b25f123-1122-4467-bc1a-641bd3200aa9"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Бронирование успешно оплачено и сохранено",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BookingResource"
+                                }
+                            }
+                        }
+                    },
+                    "410": {
+                        "description": "Срок действия резерва истек (Gone)"
+                    }
+                }
+            }
+        },
         "/hotels/popular": {
             "get": {
                 "tags": [

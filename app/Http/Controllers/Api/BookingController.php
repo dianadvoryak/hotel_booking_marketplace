@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ConfirmBookingRequest;
 use App\Http\Requests\HoldRoomRequest;
 use App\Http\Requests\StoreBookingRequest;
 use App\Http\Resources\BookingResource;
@@ -137,6 +138,55 @@ class BookingController extends Controller
             );
 
             return response()->json($result, 200);
+
+        } catch (BookingException $e) {
+            return response()->json([
+                'error' => true,
+                'message' => $e->getMessage()
+            ], $e->getCode());
+        }
+    }
+
+    #[OA\Post(
+        path: '/bookings/confirm',
+        operationId: 'confirmBooking',
+        description: 'Проверяет токен в Redis. Если он валиден, переносит бронь в PostgreSQL и очищает память в Redis.',
+        summary: 'Подтвердить и оплатить бронирование по токену резерва',
+        tags: ['Bookings']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['reservation_token'],
+            properties: [
+                new OA\Property(
+                    property: 'reservation_token',
+                    type: 'string',
+                    format: 'uuid',
+                    example: '3b25f123-1122-4467-bc1a-641bd3200aa9'
+                )
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Бронирование успешно оплачено и сохранено',
+        content: new OA\JsonContent(ref: '#/components/schemas/BookingResource')
+    )]
+    #[OA\Response(
+        response: 410,
+        description: 'Срок действия резерва истек (Gone)'
+    )]
+    public function confirm(ConfirmBookingRequest $request): JsonResponse
+    {
+        try {
+            $booking = $this->bookingService->confirmBooking(
+                $request->input('reservation_token')
+            );
+
+            return (new BookingResource($booking->load('hotel')))
+                ->response()
+                ->setStatusCode(200);
 
         } catch (BookingException $e) {
             return response()->json([
