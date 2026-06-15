@@ -204,6 +204,51 @@
                     }
                 }
             }
+        },
+        "/rooms/feed": {
+            "get": {
+                "tags": [
+                    "Hotels"
+                ],
+                "summary": "Лента номеров для главной страницы (Infinite Scroll)",
+                "description": "Возвращает по одному самому дешевому номеру от каждого отеля. Оптимизировано через Cursor Pagination.",
+                "operationId": "getRoomsFeed",
+                "parameters": [
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "description": "Указатель курсора для следующей страницы",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешный возврат порции данных ленты",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/RoomFeedResource"
+                                            }
+                                        },
+                                        "next_page_url": {
+                                            "type": "string",
+                                            "example": "eyJiYXNlX3ByaWNlIjo0NT"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "components": {
@@ -306,6 +351,49 @@
                         "type": "number",
                         "format": "float",
                         "example": 4.85
+                    }
+                },
+                "type": "object"
+            },
+            "RoomFeedResource": {
+                "title": "Модель номера в бесконечной ленте",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Люкс с видом на море"
+                    },
+                    "base_price": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 12500
+                    },
+                    "hotel": {
+                        "properties": {
+                            "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "example": "9c3a4f61-2e61-4b13-bb14-9b5cfda18712"
+                            },
+                            "name": {
+                                "type": "string",
+                                "example": "Grand Royal Hotel"
+                            },
+                            "city": {
+                                "type": "string",
+                                "example": "Сочи"
+                            },
+                            "rating": {
+                                "type": "number",
+                                "format": "float",
+                                "example": 4.9
+                            }
+                        },
+                        "type": "object"
                     }
                 },
                 "type": "object"
