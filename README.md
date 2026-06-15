@@ -15,5 +15,10 @@ php artisan test --filter=ConfirmBookingRequestTest
 php artisan test --testsuite=Feature
 php artisan test --filter=ControllerTest
 
+
+endpoints:
+<img src="public/endpoints.png">
+
 scheme:
 <img src="public/scheme.jpg">
+
