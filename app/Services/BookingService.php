@@ -109,7 +109,7 @@ class BookingService
 
                 // 3. ОТПРАВЛЯЕМ СОБЫТИЕ В RABBITMQ
                 // dispatch_after_commit выполнит отправку в очередь ТОЛЬКО после того,
-                // как транзакция успешно запишется в базу данных (Senior-практика!)
+                // как транзакция успешно запишется в базу данных
                 ProcessNewBookingJob::dispatch($booking->id)->afterCommit();
 
                 return $booking;

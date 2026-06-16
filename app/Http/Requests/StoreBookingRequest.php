@@ -40,7 +40,7 @@ class StoreBookingRequest extends FormRequest
     }
 
     /**
-     * Кастомные сообщения об ошибках (Senior-практика для фронтенда)
+     * Кастомные сообщения об ошибках
      */
     public function messages(): array
     {
