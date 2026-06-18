@@ -13,9 +13,19 @@ use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
+use App\Services\RabbitMQ\RabbitMQPublisher;
 
 class BookingService
 {
+
+    private RabbitMQPublisher $publisher;
+
+    // Внедряем наш новый издатель через DI контейнер Laravel
+    public function __construct(RabbitMQPublisher $publisher)
+    {
+        $this->publisher = $publisher;
+    }
+
     /**
      * Создать бронирование с защитой от race conditions
      *
@@ -226,14 +236,6 @@ class BookingService
                 'price_per_night' => $roomType->base_price,
             ]);
 
-            // Фиксируем даты в сетке занятости БД PostgreSQL
-//            foreach ($dates as $date) {
-//                RoomAvailability::updateOrCreate(
-//                    ['room_type_id' => $roomType->id, 'date' => $date],
-//                    ['booked_count' => DB::raw('booked_count + 1')]
-//                );
-//            }
-
             foreach ($dates as $date) {
                 DB::table('room_availability')->upsert(
                     [
@@ -252,8 +254,20 @@ class BookingService
                 );
             }
 
-            // Отправляем задачу воркеру RabbitMQ (генерация ваучера)
-            ProcessNewBookingJob::dispatch($booking->id)->afterCommit();
+            // Отправляем нативное сообщение в RabbitMQ
+            // Мы вызываем отправку внутри транзакции или используем callback после коммита
+            DB::afterCommit(function () use ($booking) {
+                $this->publisher->publish(
+                    exchange: 'bookings.exchange',
+                    routingKey: 'booking.created',
+                    payload: [
+                        'booking_id' => $booking->id,
+                        'user_id' => $booking->user_id,
+                        'total_price' => $booking->total_price,
+                        'created_at' => now()->toIso8601String()
+                    ]
+                );
+            });
 
             return $booking;
         });
