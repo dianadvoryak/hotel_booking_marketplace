@@ -4,6 +4,7 @@ namespace App\Services\RabbitMQ;
 
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Channel\AMQPChannel;
+use Illuminate\Support\Facades\Config;
 
 class RabbitMQConfig
 {
@@ -22,10 +23,10 @@ class RabbitMQConfig
 
         // 1. Создаем соединение с брокером (данные берем из .env)
         $this->connection = new AMQPStreamConnection(
-            config('queue.connections.rabbitmq.host', '127.0.0.1'),
-            config('queue.connections.rabbitmq.port', 5672),
-            config('queue.connections.rabbitmq.user', 'guest'),
-            config('queue.connections.rabbitmq.password', 'guest')
+            Config::get('rabbitmq.host'),
+            Config::get('rabbitmq.port'),
+            Config::get('rabbitmq.username'),
+            Config::get('rabbitmq.password')
         );
 
         $this->channel = $this->connection->channel();
